@@ -40,7 +40,6 @@
 #include "mma_utils.cuh"
 #include "scheduler.cuh"
 #include "tma_utils.cuh"
-#include "tma_descriptor_cache.cuh"
 #include "utils.cuh"
 
 namespace deep_gemm
@@ -167,47 +166,14 @@ void runGemm(cudaKernel_t kernel, void* mat_a, int ld_a, void* mat_b, int ld_b, 
     uint32_t block_k, uint32_t num_groups, uint32_t num_tma_multicast, GemmType gemm_type,
     LayoutIndexType* grouped_layout, cudaStream_t stream, int num_sms, uint32_t smem_size)
 {
-#ifndef NVRTC_JIT_COMPILATION
-    // Try to get cached TMA descriptors
-    TMADescriptorKey cache_key{mat_a, mat_b, mat_d, scales_a, shape_m, shape_n, shape_k, block_m, block_n, block_k};
-    auto* cached_desc_set = TMADescriptorCache::getInstance().get(cache_key);
-    
-    CUtensorMap tma_a_desc, tma_b_desc, tma_scales_desc, tma_d_desc;
-    
-    if (cached_desc_set)
-    {
-        // Use cached descriptors
-        tma_a_desc = cached_desc_set->tma_a_desc;
-        tma_b_desc = cached_desc_set->tma_b_desc;
-        tma_scales_desc = cached_desc_set->tma_scales_desc;
-        tma_d_desc = cached_desc_set->tma_d_desc;
-    }
-    else
-    {
-        // Create new descriptors and cache them
-        tma_a_desc = make_2d_tma_a_desc(
-            reinterpret_cast<__nv_fp8_e4m3*>(mat_a), shape_m, shape_k, block_m, block_k, num_groups, gemm_type, ld_a);
-        tma_b_desc = make_2d_tma_b_desc(
-            reinterpret_cast<__nv_fp8_e4m3*>(mat_b), shape_n, shape_k, block_n, block_k, num_groups, gemm_type, ld_b);
-        tma_scales_desc = make_2d_tma_scales_a_desc(
-            scales_a, shape_m, shape_k, block_m, block_k, num_groups, gemm_type);
-        tma_d_desc = make_2d_tma_d_desc(
-            reinterpret_cast<__nv_bfloat16*>(mat_d), shape_m, shape_n, block_m, block_n, num_groups, gemm_type, ld_d * 2);
-        
-        TMADescriptorSet desc_set{tma_a_desc, tma_b_desc, tma_scales_desc, tma_d_desc};
-        TMADescriptorCache::getInstance().insert(cache_key, desc_set);
-    }
-#else
-    // For JIT compilation, create descriptors inline
     auto tma_a_desc = make_2d_tma_a_desc(
         reinterpret_cast<__nv_fp8_e4m3*>(mat_a), shape_m, shape_k, block_m, block_k, num_groups, gemm_type, ld_a);
     auto tma_b_desc = make_2d_tma_b_desc(
         reinterpret_cast<__nv_fp8_e4m3*>(mat_b), shape_n, shape_k, block_n, block_k, num_groups, gemm_type, ld_b);
-    auto tma_scales_desc = make_2d_tma_scales_a_desc(
-        scales_a, shape_m, shape_k, block_m, block_k, num_groups, gemm_type);
+    auto tma_scales_a_desc
+        = make_2d_tma_scales_a_desc(scales_a, shape_m, shape_k, block_m, block_k, num_groups, gemm_type);
     auto tma_d_desc = make_2d_tma_d_desc(
         reinterpret_cast<__nv_bfloat16*>(mat_d), shape_m, shape_n, block_m, block_n, num_groups, gemm_type, ld_d * 2);
-#endif
 
     constexpr uint32_t kNumTMAThreads = 128;
     constexpr uint32_t kNumMathThreadsPerGroup = 128;
@@ -232,9 +198,9 @@ void runGemm(cudaKernel_t kernel, void* mat_a, int ld_a, void* mat_b, int ld_b, 
     input.shape_m = shape_m;
     input.grouped_layout = grouped_layout;
 
-    // Launch with TMA descriptors (cached or newly created)
+    // Launch
     auto status = cudaLaunchKernelEx(&config, kernel, reinterpret_cast<__nv_bfloat16*>(mat_d), scales_b, input,
-        tma_a_desc, tma_b_desc, tma_scales_desc, tma_d_desc);
+        tma_a_desc, tma_b_desc, tma_scales_a_desc, tma_d_desc);
     DG_HOST_ASSERT(status == cudaSuccess);
 }
 
@@ -244,48 +210,15 @@ void runGemmSwapAB(cudaKernel_t kernel, void* mat_a, int ld_a, void* mat_b, int 
     uint32_t block_n, uint32_t block_k, uint32_t num_groups, uint32_t num_tma_multicast, GemmType gemm_type,
     LayoutIndexType* grouped_layout, cudaStream_t stream, int num_sms, uint32_t smem_size)
 {
-#ifndef NVRTC_JIT_COMPILATION
-    // Try to get cached TMA descriptors
-    TMADescriptorKey cache_key{mat_a, mat_b, mat_d, scales_b, shape_m, shape_n, shape_k, block_m, block_n, block_k};
-    auto* cached_desc_set = TMADescriptorCache::getInstance().get(cache_key);
-    
-    CUtensorMap tma_a_desc, tma_b_desc, tma_scales_desc, tma_d_desc;
-    
-    if (cached_desc_set)
-    {
-        // Use cached descriptors
-        tma_a_desc = cached_desc_set->tma_a_desc;
-        tma_b_desc = cached_desc_set->tma_b_desc;
-        tma_scales_desc = cached_desc_set->tma_scales_desc;
-        tma_d_desc = cached_desc_set->tma_d_desc;
-    }
-    else
-    {
-        // Create new descriptors and cache them
-        tma_a_desc = make_2d_tma_a_desc_swapAB(
-            reinterpret_cast<__nv_fp8_e4m3*>(mat_a), shape_m, shape_k, block_m, block_k, num_groups, gemm_type, ld_a);
-        tma_b_desc = make_2d_tma_b_desc_swapAB(
-            reinterpret_cast<__nv_fp8_e4m3*>(mat_b), shape_n, shape_k, block_n, block_k, num_groups, gemm_type, ld_b);
-        tma_scales_desc = make_2d_tma_scales_b_desc_swapAB(
-            scales_b, shape_n, shape_k, block_n, block_k, num_groups, gemm_type);
-        tma_d_desc = make_2d_tma_d_desc_swapAB(
-            reinterpret_cast<__nv_bfloat16*>(mat_d), shape_m, shape_n, block_m, block_n, num_groups, gemm_type, ld_d * 2);
-        
-        TMADescriptorSet desc_set{tma_a_desc, tma_b_desc, tma_scales_desc, tma_d_desc};
-        TMADescriptorCache::getInstance().insert(cache_key, desc_set);
-    }
-#else
-    // For JIT compilation, create descriptors inline
     auto tma_a_desc = make_2d_tma_a_desc_swapAB(
         reinterpret_cast<__nv_fp8_e4m3*>(mat_a), shape_m, shape_k, block_m, block_k, num_groups, gemm_type, ld_a);
     auto tma_b_desc = make_2d_tma_b_desc_swapAB(
         reinterpret_cast<__nv_fp8_e4m3*>(mat_b), shape_n, shape_k, block_n, block_k, num_groups, gemm_type, ld_b);
-    auto tma_scales_desc = make_2d_tma_scales_b_desc_swapAB(
-        scales_b, shape_n, shape_k, block_n, block_k, num_groups, gemm_type);
+    auto tma_scales_b_desc
+        = make_2d_tma_scales_b_desc_swapAB(scales_b, shape_n, shape_k, block_n, block_k, num_groups, gemm_type);
     auto tma_d_desc = make_2d_tma_d_desc_swapAB(
         reinterpret_cast<__nv_bfloat16*>(mat_d), shape_m, shape_n, block_m, block_n, num_groups, gemm_type, ld_d * 2);
-#endif
-    
+
     constexpr uint32_t kNumTMAThreads = 128;
     constexpr uint32_t kNumMathThreadsPerGroup = 128;
     DG_HOST_ASSERT(cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size) == cudaSuccess);
@@ -308,9 +241,8 @@ void runGemmSwapAB(cudaKernel_t kernel, void* mat_a, int ld_a, void* mat_b, int 
     input.shape_n = shape_n;
     input.grouped_layout = grouped_layout;
 
-    // Use TMA descriptors (cached or newly created)
     auto status = cudaLaunchKernelEx(&config, kernel, reinterpret_cast<__nv_bfloat16*>(mat_d), scales_a, input,
-        tma_a_desc, tma_b_desc, tma_scales_desc, tma_d_desc);
+        tma_a_desc, tma_b_desc, tma_scales_b_desc, tma_d_desc);
     DG_HOST_ASSERT(status == cudaSuccess);
 }
 
