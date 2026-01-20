@@ -59,6 +59,17 @@ def maybe_execute_in_parallel(
 
     multi_stream = do_multi_stream() and aux_stream is not None
 
+    # Debug: Print multi-stream decision
+    import os
+    if os.environ.get('DEBUG_MULTISTREAM') == '1':
+        print(f"\n=== maybe_execute_in_parallel ===")
+        print(f"do_multi_stream(): {do_multi_stream()}")
+        print(f"aux_stream: {aux_stream}")
+        if aux_stream:
+            print(f"aux_stream.cuda_stream: {aux_stream.cuda_stream}")
+        print(f"multi_stream decision: {multi_stream}")
+        print(f"Current stream: {torch.cuda.current_stream().cuda_stream}")
+
     if multi_stream:
         event0.record()
         result0 = fn0()

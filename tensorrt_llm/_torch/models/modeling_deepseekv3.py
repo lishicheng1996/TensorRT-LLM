@@ -896,6 +896,16 @@ class Deepseekv3MoE(nn.Module):
         if not do_finalize:
             assert not self.use_dp
 
+        # Debug: Print MoE stream info
+        import os
+        if os.environ.get('DEBUG_MULTISTREAM') == '1':
+            print(f"\n=== Deepseekv3MoE.forward (layer {self.layer_idx}) ===")
+            print(f"self.aux_stream: {self.aux_stream}")
+            if self.aux_stream:
+                print(f"self.aux_stream.cuda_stream: {self.aux_stream.cuda_stream}")
+            print(f"self.event_dict: {self.event_dict}")
+            print(f"Current stream: {torch.cuda.current_stream().cuda_stream}")
+
         def _compute_shared_output():
             shared_output = self.shared_experts(
                 hidden_states_fp4
