@@ -573,7 +573,7 @@ class PyExecutor:
                 torch.cuda.cudart().cudaProfilerStop()
                 enabled = False
 
-            if start_time is not None and self.print_log and self.dist.rank == 0:
+            if start_time is not None and self.print_log:
                 end_time = time.time()
                 if it % 2 == 0:
                     end_event_1.record()
