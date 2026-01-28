@@ -883,6 +883,7 @@ class DeepSeekFP8TRTLLMGenBlockScalesFusedMoEMethod(
     # This assumes the same input shape always results in the same permute indices
     _cache_permute_indices: Dict[torch.Size, torch.Tensor] = {}
 
+    @staticmethod
     def convert_to_block_layout(input_tensor: torch.Tensor,
                                 blockK: int) -> torch.Tensor:
         M, K = input_tensor.shape

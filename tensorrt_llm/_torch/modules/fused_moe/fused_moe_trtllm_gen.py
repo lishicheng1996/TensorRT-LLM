@@ -19,7 +19,8 @@ from ...utils import AuxStreamType, Fp4QuantizedTensor
 from .interface import AlltoallMethodType, MoE, MoEWeightLoadingMode
 
 # isort: off
-from .quantization import (NVFP4TRTLLMGenFusedMoEMethod,
+from .quantization import (DeepSeekFP8TRTLLMGenBlockScalesFusedMoEMethod,
+                           NVFP4TRTLLMGenFusedMoEMethod,
                            UnquantizedFusedMoEMethod,
                            W4A8MXFP4FP8TRTLLMGenFusedMoEMethod,
                            W4A8MXFP4MXFP8TRTLLMGenFusedMoEMethod,
