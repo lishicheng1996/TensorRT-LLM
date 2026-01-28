@@ -939,7 +939,7 @@ class DeepSeekFP8TRTLLMGenBlockScalesFusedMoEMethod(
             permute_indices.to(dst_w3_w1_weight_gpu.device))
 
         # Convert to block row-major layout
-        processed_w31_weight_shard = convert_to_block_layout(
+        processed_w31_weight_shard = self.convert_to_block_layout(
             processed_w31_weight_shard, 128)
 
         # Copy the result into device buffer
@@ -992,7 +992,7 @@ class DeepSeekFP8TRTLLMGenBlockScalesFusedMoEMethod(
             dst_w2_weight_gpu, permute_indices.to(dst_w2_weight_gpu.device))
 
         # Convert to block row-major layout
-        processed_w2_weight = convert_to_block_layout(processed_w2_weight, 128)
+        processed_w2_weight = self.convert_to_block_layout(processed_w2_weight, 128)
 
         # Copy the result into device buffer
         dst_w2_weight_gpu.copy_(processed_w2_weight.view(
