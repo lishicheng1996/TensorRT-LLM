@@ -1640,12 +1640,13 @@ class DeepseekV3ForCausalLM(SpecDecOneEngineForCausalLM[DeepseekV3Model,
         # Also process MTP layers if present
         if self.draft_model is not None and hasattr(self.draft_model,
                                                     'mtp_layers'):
-            for layer in self.model.layers[self.config.num_hidden_layers:]:
+            for idx, layer in enumerate(self.model.layers[self.config.num_hidden_layers:]):
                 # MTP layers also have MoE, need to fuse shared experts
                 if hasattr(layer, 'mlp') and hasattr(layer.mlp, 'experts'):
                     if hasattr(layer.mlp.experts, 'num_fused_shared_expert'
                                ) and layer.mlp.experts.num_fused_shared_expert > 0:
                         # debug: 展示layer, layer.mlp, layer.mlp.experts, layer.mlp.shared_experts的class name
+                        print(f"idx: {idx}")
                         print(f"layer: {layer.__class__.__name__}")
                         print(f"layer.mlp: {layer.mlp.__class__.__name__}")
                         print(f"layer.mlp.experts: {layer.mlp.experts.__class__.__name__}")
