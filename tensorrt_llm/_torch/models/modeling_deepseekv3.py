@@ -1645,6 +1645,11 @@ class DeepseekV3ForCausalLM(SpecDecOneEngineForCausalLM[DeepseekV3Model,
                 if hasattr(layer, 'mlp') and hasattr(layer.mlp, 'experts'):
                     if hasattr(layer.mlp.experts, 'num_fused_shared_expert'
                                ) and layer.mlp.experts.num_fused_shared_expert > 0:
+                        # debug: 展示layer, layer.mlp, layer.mlp.experts, layer.mlp.shared_experts的class name
+                        print(f"layer: {layer.__class__.__name__}")
+                        print(f"layer.mlp: {layer.mlp.__class__.__name__}")
+                        print(f"layer.mlp.experts: {layer.mlp.experts.__class__.__name__}")
+                        print(f"layer.mlp.shared_experts: {layer.mlp.shared_experts.__class__.__name__}")
                         layer.mlp.experts.fuse_shared_expert(
                             layer.mlp.shared_experts)
                         layer.mlp.shared_experts = None
